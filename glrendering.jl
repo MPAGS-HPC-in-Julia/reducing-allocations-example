@@ -1,4 +1,4 @@
-using ModernGL, GLFW
+using ModernGL, GLFW, FreeType
 using LinearAlgebra
 using StaticArrays
 
@@ -57,7 +57,8 @@ const graph_vertex_shader = """
     
     void main()
     {
-        gl_Position = vec4(aPos.x, aPos.y * uHeight, 0.0, 1.0);
+        // Move to bottom of screen and scale height
+        gl_Position = vec4(aPos.x, (aPos.y * uHeight) - (1.0 - uHeight), 0.0, 1.0);
     }
 """
 
@@ -68,6 +69,37 @@ const graph_fragment_shader = """
     void main()
     {
         FragColor = vec4(1.0, 1.0, 0.0, 1.0);  // Yellow color
+    }
+"""
+
+const text_vertex_shader = """
+    #version 330 core
+    layout (location = 0) in vec4 vertex; // <vec2 pos, vec2 tex>
+    
+    uniform vec2 uPosition;
+    uniform vec2 uScale;
+    
+    out vec2 TexCoords;
+    
+    void main()
+    {
+        gl_Position = vec4(uPosition + (vertex.xy * uScale), 0.0, 1.0);
+        TexCoords = vertex.zw;
+    }
+"""
+
+const text_fragment_shader = """
+    #version 330 core
+    in vec2 TexCoords;
+    out vec4 FragColor;
+    
+    uniform sampler2D text;
+    uniform vec3 textColor;
+    
+    void main()
+    {    
+        vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r);
+        FragColor = vec4(textColor, 1.0) * sampled;
     }
 """
 
@@ -165,6 +197,121 @@ mutable struct FrameTracker
     max_time::Float32
 end
 
+# Add new struct for character info
+struct Character
+    texture_id::GLuint
+    size::Tuple{Float32, Float32}
+    bearing::Tuple{Float32, Float32}
+    advance::Float32
+end
+
+# Replace create_text_vertices with new text rendering system
+function init_font()
+    chars = Dict{Char, Character}()
+    
+    # Initialize FreeType
+    library = Vector{FT_Library}(undef, 1)
+    error = FT_Init_FreeType(library)
+    if error != 0
+        error_message = unsafe_string(FT_Error_String(error))
+        @error "Failed to initialize FreeType: $error_message"
+        return chars
+    end
+    
+    # Load Consolas font - adjust path as needed
+    face = Vector{FT_Face}(undef, 500000)
+    error = FT_New_Face(library, "C:\\Windows\\Fonts\\consola.ttf", 0, face)
+    if error != 0
+        FT_Done_FreeType(library)
+        error_message = unsafe_string(FT_Error_String(error))
+        @error "Failed to load font: $error_message"
+        return chars
+    end
+
+    FT_Set_Pixel_Sizes(face, 0, 48)
+    
+    # Disable byte-alignment restriction
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    
+    # Load first 128 ASCII characters
+    for c in Char(0):Char(127)
+        # Load character glyph
+        FT_Load_Char(face, c, FT_LOAD_RENDER)
+        
+        # Generate texture
+        texture = GLuint(0)
+        glGenTextures(1, Ref(texture))
+        glBindTexture(GL_TEXTURE_2D, texture)
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RED,
+            face.glyph.bitmap.width,
+            face.glyph.bitmap.rows,
+            0,
+            GL_RED,
+            GL_UNSIGNED_BYTE,
+            face.glyph.bitmap.buffer
+        )
+        
+        # Set texture options
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        
+        # Store character
+        chars[c] = Character(
+            texture,
+            (Float32(face.glyph.bitmap.width), Float32(face.glyph.bitmap.rows)),
+            (Float32(face.glyph.bitmap_left), Float32(face.glyph.bitmap_top)),
+            Float32(face.glyph.advance.x >> 6)
+        )
+    end
+    
+    FT_Done_Face(face)
+    FT_Done_FreeType(library)
+    
+    return chars
+end
+
+function render_text(text::String, chars::Dict{Char,Character}, x::Float32, y::Float32, scale::Float32, vao::GLuint, vbo::GLuint)
+    glBindVertexArray(vao)
+    
+    for c in text
+        ch = chars[c]
+        
+        xpos = x + ch.bearing[1] * scale
+        ypos = y - (ch.size[2] - ch.bearing[2]) * scale
+        
+        w = ch.size[1] * scale
+        h = ch.size[2] * scale
+        
+        # Update VBO for each character
+        vertices = Float32[
+            xpos,     ypos + h,   0.0, 0.0,
+            xpos,     ypos,       0.0, 1.0,
+            xpos + w, ypos,       1.0, 1.0,
+            xpos,     ypos + h,   0.0, 0.0,
+            xpos + w, ypos,       1.0, 1.0,
+            xpos + w, ypos + h,   1.0, 0.0
+        ]
+        
+        # Render glyph texture over quad
+        glBindTexture(GL_TEXTURE_2D, ch.texture_id)
+        
+        # Update content of VBO memory
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices)
+        
+        # Render quad
+        glDrawArrays(GL_TRIANGLES, 0, 6)
+        
+        # Advance cursors for next glyph
+        x += ch.advance * scale
+    end
+end
+
 function main()
     # Initialize GLFW and create window
     GLFW.Init()
@@ -203,12 +350,37 @@ function main()
     glAttachShader(graph_program, graph_fragment_shader_id)
     glLinkProgram(graph_program)
 
+    # Create text shader program
+    text_vertex_shader_id = glCreateShader(GL_VERTEX_SHADER)
+    glShaderSource(text_vertex_shader_id, 1, Ptr{GLchar}[pointer(text_vertex_shader)], C_NULL)
+    glCompileShader(text_vertex_shader_id)
+
+    text_fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER)
+    glShaderSource(text_fragment_shader_id, 1, Ptr{GLchar}[pointer(text_fragment_shader)], C_NULL)
+    glCompileShader(text_fragment_shader_id)
+
+    text_program = glCreateProgram()
+    glAttachShader(text_program, text_vertex_shader_id)
+    glAttachShader(text_program, text_fragment_shader_id)
+    glLinkProgram(text_program)
+
     # Create graph VAO and VBO
     graph_vao = Ref{GLuint}()
     graph_vbo = Ref{GLuint}()
     glGenVertexArrays(1, graph_vao)
     glGenBuffers(1, graph_vbo)
     
+    # Create text VAO and VBO
+    text_vao = Ref{GLuint}()
+    text_vbo = Ref{GLuint}()
+    glGenVertexArrays(1, text_vao)
+    glGenBuffers(1, text_vbo)
+    glBindVertexArray(text_vao[])
+    glBindBuffer(GL_ARRAY_BUFFER, text_vbo[])
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Float32) * 6 * 4, C_NULL, GL_DYNAMIC_DRAW)
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, C_NULL)
+
     # Initialize frame tracker
     frame_tracker = FrameTracker(zeros(Float32, MAX_FRAMES), 1, 0.0f0)
 
@@ -299,6 +471,20 @@ function main()
     target_fps = 60
     frame_time = 1 / target_fps
 
+    # Initialize font
+    characters = init_font()
+    
+    # Configure VAO/VBO for texture quads
+    text_vao = Ref{GLuint}()
+    text_vbo = Ref{GLuint}()
+    glGenVertexArrays(1, text_vao)
+    glGenBuffers(1, text_vbo)
+    glBindVertexArray(text_vao[])
+    glBindBuffer(GL_ARRAY_BUFFER, text_vbo[])
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Float32) * 6 * 4, C_NULL, GL_DYNAMIC_DRAW)
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, C_NULL)
+
     # Main loop
     while !GLFW.WindowShouldClose(window)
         frame_start = time()
@@ -353,11 +539,18 @@ function main()
         frame_tracker.max_time = max(frame_tracker.max_time, frame_time)
         frame_tracker.index = frame_tracker.index % MAX_FRAMES + 1
         
-        # Generate graph vertices
+        # Generate graph vertices with newest frames on right
         graph_vertices = Float32[]
+        current_idx = frame_tracker.index - 1
+        if current_idx == 0
+            current_idx = MAX_FRAMES
+        end
+        
         for i in 1:MAX_FRAMES
-            x = 2.0f0 * (i - 1) / (MAX_FRAMES - 1) - 1.0f0  # [-1, 1]
-            y = frame_tracker.times[i] / frame_tracker.max_time  # Normalized height
+            # Map x from [-1,1] with newest frame at 1
+            x = 2.0f0 * (MAX_FRAMES - i) / (MAX_FRAMES - 1) - 1.0f0
+            idx = mod1(current_idx - (i-1), MAX_FRAMES)
+            y = frame_tracker.times[idx] / frame_tracker.max_time
             push!(graph_vertices, x, y)
         end
         
@@ -370,10 +563,23 @@ function main()
         glEnableVertexAttribArray(0)
         
         height_loc = glGetUniformLocation(graph_program, "uHeight")
-        glUniform1f(height_loc, 0.2f0)  # Graph takes up bottom 20% of screen
+        glUniform1f(height_loc, 0.1f0)  # Graph takes up bottom 10% of screen
         
         glDrawArrays(GL_LINE_STRIP, 0, length(graph_vertices)÷2)
         
+        # Draw scale markers
+        glUseProgram(text_program)
+        glActiveTexture(GL_TEXTURE0)
+        glUniform1i(glGetUniformLocation(text_program, "text"), 0)
+        
+        # Draw "0ms" at bottom
+        glUniform3f(glGetUniformLocation(text_program, "textColor"), 1.0, 1.0, 1.0)
+        render_text("0ms", characters, -0.95f0, -0.95f0, 0.001f0, text_vao[], text_vbo[])
+        
+        # Draw max time marker
+        max_ms = round(frame_tracker.max_time * 1000, digits=1)
+        render_text("$(max_ms)ms", characters, -0.95f0, -0.85f0, 0.001f0, text_vao[], text_vbo[])
+
         # Show current FPS in window title
         GLFW.SetWindowTitle(window, "Sphere Instancing - FPS: $(round(1/frame_time, digits=1))")
         
@@ -399,6 +605,15 @@ function main()
     glDeleteProgram(graph_program)
     glDeleteVertexArrays(1, graph_vao)
     glDeleteBuffers(1, graph_vbo)
+
+    glDeleteProgram(text_program)
+    glDeleteVertexArrays(1, text_vao)
+    glDeleteBuffers(1, text_vbo)
+
+    # Clean up font textures
+    for char in values(characters)
+        glDeleteTextures(1, Ref(char.texture_id))
+    end
 
     GLFW.DestroyWindow(window)
     GLFW.Terminate()
