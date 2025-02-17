@@ -1,6 +1,7 @@
 include("rendering/rendering.jl")
 include("rendering/sphere_scene.jl")
 include("physics.jl")
+include("initial_conditions.jl")
 using StaticArrays
 
 struct RenderFn{S, P, V, M}
