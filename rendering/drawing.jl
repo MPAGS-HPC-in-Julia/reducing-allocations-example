@@ -44,7 +44,8 @@ function draw_text(buffer, vertices_store, text_program, text_vao, text_vbo, cha
     render_text("0ms", vertices_store, characters, 10.0f0, 25.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
     render_text("16ms", vertices_store, characters, 10.0f0, 100.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
 
-    max_ms = Int(round(maximum(frame_tracker.times) * 1000))
+    max_frametime = calculate_max_frametime(frame_tracker, 60)
+    max_ms = Int(round(max_frametime * 1000))
     
     # Empty the buffer
     empty!(buffer)
@@ -54,7 +55,7 @@ function draw_text(buffer, vertices_store, text_program, text_vao, text_vbo, cha
     buf_text = get_string(buffer)
     render_text(buf_text, vertices_store, characters, 1600.0f0, 1050.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
 
-    avg_fps = calculate_average_fps(frame_tracker.times)
+    avg_fps = calculate_average_fps(frame_tracker, 180)
     if isnan(avg_fps)
         return
     end
