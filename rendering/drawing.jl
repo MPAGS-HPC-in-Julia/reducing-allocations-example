@@ -17,7 +17,7 @@ function draw_graph(graph_program, graph_vao, graph_vbo, graph_vertices)
 
     color_loc = glGetUniformLocation(graph_program, "uColor")
 
-    glLineWidth(2.0f0)
+    glLineWidth(4.0f0)
 
     frame_limit = 0.02f0
 

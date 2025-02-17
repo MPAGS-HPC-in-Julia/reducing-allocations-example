@@ -121,7 +121,6 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
         # Draw call here
         update_fn(window)
 
-
         generate_graph_vertices!(graph_vertices_buffer, window.frame_tracker)
         draw_graph(window.graph_shader.program, window.graph_vao[], window.graph_vbo[], graph_vertices_buffer)
 
