@@ -1,6 +1,6 @@
 
 # Shader sources
-const vertex_shader = """
+const MAIN_VERTEX_SHADER = """
     #version 330 core
     layout (location = 0) in vec3 aPos;
     layout (location = 1) in vec3 aNormal;
@@ -24,7 +24,7 @@ const vertex_shader = """
     }
 """
 
-const fragment_shader = """
+const MAIN_FRAGMENT_SHADER = """
     #version 330 core
     in vec3 Normal;
     in vec3 FragPos;
@@ -46,7 +46,7 @@ const fragment_shader = """
 """
 
 # Add new shader constants at the top after existing shaders
-const graph_vertex_shader = """
+const GRAPH_VERTEX_SHADER = """
     #version 330 core
     layout (location = 0) in vec2 aPos;
     
@@ -58,7 +58,7 @@ const graph_vertex_shader = """
     }
 """
 
-const graph_fragment_shader = """
+const GRAPH_FRAGMENT_SHADER = """
     #version 330 core
     out vec4 FragColor;
     
@@ -70,7 +70,7 @@ const graph_fragment_shader = """
     }
 """
 
-const text_vertex_shader = """
+const TEXT_VERTEX_SHADER = """
     #version 330 core
     layout (location = 0) in vec4 vertex; // <vec2 pos, vec2 tex>
     out vec2 TexCoords;
@@ -83,7 +83,7 @@ const text_vertex_shader = """
     }
 """
 
-const text_fragment_shader = """
+const TEXT_FRAGMENT_SHADER = """
     #version 330 core
     in vec2 TexCoords;
     out vec4 FragColor;
@@ -97,3 +97,27 @@ const text_fragment_shader = """
         FragColor = vec4(textColor, 1.0) * sampled;
     }
 """
+
+
+struct Shader
+    vertex_shader_id::GLuint
+    fragment_shader_id::GLuint
+    program::GLuint
+end
+
+function Shader(vertex_shader, fragment_shader)
+    vertex_shader_id = glCreateShader(GL_VERTEX_SHADER)
+    glShaderSource(vertex_shader_id, 1, Ptr{GLchar}[pointer(vertex_shader)], C_NULL)
+    glCompileShader(vertex_shader_id)
+
+    fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER)
+    glShaderSource(fragment_shader_id, 1, Ptr{GLchar}[pointer(fragment_shader)], C_NULL)
+    glCompileShader(fragment_shader_id)
+
+    program = glCreateProgram()
+    glAttachShader(program, vertex_shader_id)
+    glAttachShader(program, fragment_shader_id)
+    glLinkProgram(program)
+
+    return Shader(vertex_shader_id, fragment_shader_id, program)
+end

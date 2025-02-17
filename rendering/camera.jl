@@ -6,6 +6,17 @@ mutable struct Camera
     pitch::Float32
 end
 
+function Camera() # Default camera
+    camera = Camera(
+        SVector{3,Float32}(0, 0, 15),  # Move camera further out on z-axis
+        SVector{3,Float32}(0, 0, -1),  # Keep looking towards center
+        SVector{3,Float32}(0, 1, 0),
+        -90.0f0,
+        0.0f0
+    )
+    return camera
+end
+
 mutable struct MouseUpdate <: Function
     camera::Camera
     first_mouse::Bool
@@ -29,7 +40,7 @@ function (m::MouseUpdate)(window, xpos, ypos)
     yoffset *= sensitivity
 
     camera = m.camera
-    
+
     camera.yaw += xoffset
     camera.pitch += yoffset
 

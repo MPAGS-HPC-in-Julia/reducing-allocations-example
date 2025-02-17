@@ -11,65 +11,18 @@ include("geometry.jl")
 include("text.jl")
 include("utils.jl")
 
+
 # Main window loop
-function main()
-    camera = Camera(
-        SVector{3,Float32}(0, 0, 15),  # Move camera further out on z-axis
-        SVector{3,Float32}(0, 0, -1),  # Keep looking towards center
-        SVector{3,Float32}(0, 1, 0),
-        -90.0f0,
-        0.0f0
-    )
+function main(width::Integer, height::Integer, title::String)
+    camera = Camera()
     # Initialize GLFW and create window
     GLFW.Init()
-    window = GLFW.CreateWindow(1920, 1080, "Sphere Instancing")
+    window = GLFW.CreateWindow(width, height, title)
     GLFW.MakeContextCurrent(window)
 
-    # Create and compile shaders
-    vertex_shader_id = GLuint(0)
-    fragment_shader_id = GLuint(0)
-
-    vertex_shader_id = glCreateShader(GL_VERTEX_SHADER)
-    glShaderSource(vertex_shader_id, 1, Ptr{GLchar}[pointer(vertex_shader)], C_NULL)
-    glCompileShader(vertex_shader_id)
-
-    fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER)
-    glShaderSource(fragment_shader_id, 1, Ptr{GLchar}[pointer(fragment_shader)], C_NULL)
-    glCompileShader(fragment_shader_id)
-
-    program = glCreateProgram()
-    glAttachShader(program, vertex_shader_id)
-    glAttachShader(program, fragment_shader_id)
-    glLinkProgram(program)
-
-    # Add after shader program creation
-    # Create graph shader program
-    graph_vertex_shader_id = glCreateShader(GL_VERTEX_SHADER)
-    glShaderSource(graph_vertex_shader_id, 1, Ptr{GLchar}[pointer(graph_vertex_shader)], C_NULL)
-    glCompileShader(graph_vertex_shader_id)
-
-    graph_fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER)
-    glShaderSource(graph_fragment_shader_id, 1, Ptr{GLchar}[pointer(graph_fragment_shader)], C_NULL)
-    glCompileShader(graph_fragment_shader_id)
-
-    graph_program = glCreateProgram()
-    glAttachShader(graph_program, graph_vertex_shader_id)
-    glAttachShader(graph_program, graph_fragment_shader_id)
-    glLinkProgram(graph_program)
-
-    # Create text shader program
-    text_vertex_shader_id = glCreateShader(GL_VERTEX_SHADER)
-    glShaderSource(text_vertex_shader_id, 1, Ptr{GLchar}[pointer(text_vertex_shader)], C_NULL)
-    glCompileShader(text_vertex_shader_id)
-
-    text_fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER)
-    glShaderSource(text_fragment_shader_id, 1, Ptr{GLchar}[pointer(text_fragment_shader)], C_NULL)
-    glCompileShader(text_fragment_shader_id)
-
-    text_program = glCreateProgram()
-    glAttachShader(text_program, text_vertex_shader_id)
-    glAttachShader(text_program, text_fragment_shader_id)
-    glLinkProgram(text_program)
+    main_shader = Shader(MAIN_VERTEX_SHADER, MAIN_FRAGMENT_SHADER)
+    graph_shader = Shader(GRAPH_VERTEX_SHADER, GRAPH_FRAGMENT_SHADER)
+    text_shader = Shader(TEXT_VERTEX_SHADER, TEXT_FRAGMENT_SHADER)
 
     # Create graph VAO and VBO
     graph_vao = Ref{GLuint}()
@@ -208,17 +161,17 @@ function main()
 
         handle_input(window, camera, 0.05f0)
 
-        glUseProgram(program)
-        update_camera(camera, program)
+        glUseProgram(main_shader.program)
+        update_camera(camera, main_shader.program)
         draw_spheres(vao, indices, num_instances)
 
         frame_time = Float32(time() - frame_start)
         update_frame_tracker(frame_tracker, frame_time)
 
         graph_vertices = generate_graph_vertices(frame_tracker)
-        draw_graph(graph_program, graph_vao[], graph_vbo[], graph_vertices)
+        draw_graph(graph_shader.program, graph_vao[], graph_vbo[], graph_vertices)
 
-        draw_text(text_program, text_vao[], text_vbo[], characters, text_projection, frame_tracker)
+        draw_text(text_shader.program, text_vao[], text_vbo[], characters, text_projection, frame_tracker)
 
         GLFW.SwapBuffers(window)
         GLFW.PollEvents()
@@ -239,11 +192,11 @@ function main()
     glDeleteBuffers(1, size_vbo)
 
     # Add to cleanup
-    glDeleteProgram(graph_program)
+    glDeleteProgram(graph_shader.program)
     glDeleteVertexArrays(1, graph_vao)
     glDeleteBuffers(1, graph_vbo)
 
-    glDeleteProgram(text_program)
+    glDeleteProgram(text_shader.program)
     glDeleteVertexArrays(1, text_vao)
     glDeleteBuffers(1, text_vbo)
 

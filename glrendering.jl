@@ -2,4 +2,4 @@
 include("rendering/rendering.jl")
 
 
-main()
+main(1920, 1080, "Sphere Rendering")
