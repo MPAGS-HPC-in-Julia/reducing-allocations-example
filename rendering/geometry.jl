@@ -31,8 +31,7 @@ function create_sphere(radius, segments)
 end
 
 
-function generate_graph_vertices(frame_tracker)
-    graph_vertices = Float32[]
+function generate_graph_vertices!(graph_vertices, frame_tracker)
     current_idx = frame_tracker.index - 1
     if current_idx == 0
         current_idx = frame_tracker.time_horizon
@@ -42,7 +41,8 @@ function generate_graph_vertices(frame_tracker)
         x = 2.0f0 * (frame_tracker.time_horizon - i) / (frame_tracker.time_horizon - 1) - 1.0f0
         idx = mod1(current_idx - (i - 1), frame_tracker.time_horizon)
         y = frame_tracker.times[idx] / 0.060f0
-        push!(graph_vertices, x, y)
+        graph_vertices[2 * i - 1] = x
+        graph_vertices[2 * i] = y
     end
     return graph_vertices
 end

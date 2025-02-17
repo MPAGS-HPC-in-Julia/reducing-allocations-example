@@ -121,3 +121,7 @@ function Shader(vertex_shader, fragment_shader)
 
     return Shader(vertex_shader_id, fragment_shader_id, program)
 end
+
+function cleanup(shader::Shader)
+    glDeleteProgram(shader.program)
+end
