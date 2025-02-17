@@ -1,4 +1,5 @@
 using BenchmarkTools
+using StaticArrays
 
 mutable struct UpdateCache
     k1v::Matrix{Float64}
@@ -20,26 +21,22 @@ function UpdateCache(N, d, T=Float64)
     )
 end
 
-function acceleration_fast!(acceleration, positions, masses, G)
-    # Positions: N x d matrix with x, y, z... coordinates
-    # Masses: N vector
-    # G: Gravitational constant
-
-    N, d = size(positions)
+function acceleration_fast!(acceleration, positions, masses, G, ::Val{D}) where {D}
+    N, _ = size(positions)
     acceleration .= 0
     @inbounds for i in 1:N 
-        xi = @views positions[i, :]
+        xi = SVector((positions[i, k] for k in 1:D)...)
         mi = masses[i]
         for j in (i+1):N
-            xj = @views positions[j, :]
+            xj = SVector((positions[j, k] for k in 1:D)...)
             mj = masses[j]
             r = 0
-            for k in 1:d
+            for k in 1:D
                 r += (xi[k] - xj[k])^2
             end
             r = sqrt(r)
             scale = G * inv(r*r*r)
-            for k in 1:d
+            for k in 1:D
                 ak = scale * (xj[k] - xi[k])
                 acceleration[i, k] += ak * mj
                 acceleration[j, k] -= ak * mi
@@ -49,21 +46,21 @@ function acceleration_fast!(acceleration, positions, masses, G)
     return acceleration
 end
 
-function update_positions_fast!(cache, positions, velocities, masses, G, dt)
+function update_positions_fast!(cache, positions, velocities, masses, G, dt, dim)
     # Calculate next position based on Runge Kutta method
-    cache.k1v .= dt .* acceleration_fast!(cache.acceleration, positions, masses, G)
+    cache.k1v .= dt .* acceleration_fast!(cache.acceleration, positions, masses, G, dim)
     cache.k1p .= dt .* velocities
 
     cache.next_positions .= @. positions + 0.5 * cache.k1p
-    cache.k2v .= (dt/2) .* acceleration_fast!(cache.acceleration, cache.next_positions, masses, G)
+    cache.k2v .= (dt/2) .* acceleration_fast!(cache.acceleration, cache.next_positions, masses, G, dim)
     cache.k2p .= (dt/2) .* (velocities .+ 0.5 .* cache.k1v)
 
     cache.next_positions .= @. positions + 0.5 * cache.k2p    
-    cache.k3v .= (dt/2) .* acceleration_fast!(cache.acceleration, cache.next_positions, masses, G)
+    cache.k3v .= (dt/2) .* acceleration_fast!(cache.acceleration, cache.next_positions, masses, G, dim)
     cache.k3p .= (dt/2) .* (velocities .+ 0.5 .* cache.k2v)
     
     cache.next_positions .= @. positions + cache.k3p
-    cache.k4v .= dt .* acceleration_fast!(cache.acceleration, cache.next_positions, masses, G)
+    cache.k4v .= dt .* acceleration_fast!(cache.acceleration, cache.next_positions, masses, G, dim)
     cache.k4p .= dt .* (velocities .+ cache.k3v)
 
     cache.next_velocities .= @. velocities + (cache.k1v + 2*cache.k2v + 2*cache.k3v + cache.k4v) / 6
@@ -82,9 +79,9 @@ function test_optimisations()
     dt = 0.01
 
     cache = UpdateCache(N, D, Float64)
-
+    dimVal = Val(D)
     next_positions, next_velocities = update_positions(positions, velocities, masses, G, dt)
-    next_positions_fast, next_velocities_fast = update_positions_fast!(cache, positions, velocities, masses, G, dt)
+    next_positions_fast, next_velocities_fast = update_positions_fast!(cache, positions, velocities, masses, G, dt, dimVal)
 
     @testset "Positions" begin
         @test next_positions ≈ next_positions_fast
@@ -103,7 +100,7 @@ function test_optimisations()
     println("Old benchmark:")
     display(@benchmark update_positions($positions, $velocities, $masses, $G, $dt))
     println("New benchmark:")
-    display(@benchmark update_positions_fast!($cache, $positions, $velocities, $masses, $G, $dt))
+    display(@benchmark update_positions_fast!($cache, $positions, $velocities, $masses, $G, $dt, $dimVal))
 end
 
 function acceleration(positions, masses, G)
