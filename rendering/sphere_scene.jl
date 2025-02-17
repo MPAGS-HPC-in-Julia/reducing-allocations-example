@@ -4,6 +4,7 @@ struct SphereScene
     num_instances::Int
     radii::Vector{Float32}
     positions::Matrix{Float32}
+    colors::Matrix{Float32}
     vao::GLuint
     vbo::GLuint
     ebo::GLuint
@@ -14,7 +15,7 @@ struct SphereScene
     shader::Shader
 end
 
-function SphereScene(num_instances::Int, radii::Vector{Float32}, positions::Matrix{Float32})
+function SphereScene(num_instances::Int, radii::Vector{Float32}, positions::Matrix{Float32}, colors::Matrix{Float32})
     # Create shader
     shader = Shader(MAIN_VERTEX_SHADER, MAIN_FRAGMENT_SHADER)
 
@@ -63,9 +64,8 @@ function SphereScene(num_instances::Int, radii::Vector{Float32}, positions::Matr
     glVertexAttribDivisor(2, 1)
 
     # Colors
-    colors = [SVector{3,Float32}(rand(), rand(), rand()) for _ in 1:num_instances]
     glBindBuffer(GL_ARRAY_BUFFER, color_vbo[])
-    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), reshape(reinterpret(Float32, colors), :), GL_STATIC_DRAW)
+    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW)
     glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, C_NULL)
     glEnableVertexAttribArray(3)
     glVertexAttribDivisor(3, 1)
@@ -85,6 +85,7 @@ function SphereScene(num_instances::Int, radii::Vector{Float32}, positions::Matr
         num_instances,
         radii,
         positions,
+        colors,
         vao[],
         vbo[],
         ebo[],

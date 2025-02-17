@@ -23,11 +23,24 @@ function initial_conditions(N, thickness, radius)
         return direction * (rand() * 2  + 5)
     end
     velocities = Matrix(transpose(hcat(velocities...)))
+    velocities .*= 2
 
     masses = rand(N)
+
+    # Set the inner particle to be stationary and very large
+    masses[1] = 1000
+    velocities[1, :] = [0, 0, 0]
+    positions[1, :] = [0, 0, 0]
+
+    com = sum(positions .* masses, dims=1) / sum(masses)
+    positions .-= com
+
+    com_velocity = sum(velocities .* masses, dims=1) / sum(masses)
+    velocities .-= com_velocity
+
     return positions, velocities, masses
 end
-function force(positions, masses, G)
+function acceleration(positions, masses, G)
     # Positions: N x 3 matrix with x, y, z coordinates
     # Masses: N vector
     # G: Gravitational constant
@@ -45,7 +58,7 @@ function force(positions, masses, G)
     r = sqrt.(dx.^2 + dy.^2 + dz.^2)
     r = max.(r, 1e-3) # Avoid division by zero
     
-    F = G * (masses' .* masses) ./ (r.^2)
+    F = G * (masses .* masses') ./ (r.^2)
     # Set the diagonal to zero to avoid self-interaction
     for i in 1:N
         F[i, i] = 0
@@ -61,22 +74,22 @@ function force(positions, masses, G)
     Fy = sum(Fy, dims=2)
     Fz = sum(Fz, dims=2)
     
-    F = hcat(Fx, Fy, Fz)
+    F = hcat(Fx, Fy, Fz) ./ masses
     # Create N x 3 force array with x, y, z components
     return F
 end
 function update_positions(positions, velocities, masses, G, dt)
     # Calculate next position based on 2nd Order Runge Kutta method
-    k1v = dt * force(positions, masses, G)
+    k1v = dt * acceleration(positions, masses, G)
     k1p = dt * velocities
 
-    k2v = (dt/2) * force(positions + 0.5 * k1p, masses, G)
+    k2v = (dt/2) * acceleration(positions + 0.5 * k1p, masses, G)
     k2p = (dt/2) * (velocities + 0.5 * k1v)
     
-    k3v = (dt/2) * force(positions + 0.5 * k2p, masses, G)
+    k3v = (dt/2) * acceleration(positions + 0.5 * k2p, masses, G)
     k3p = (dt/2) * (velocities + 0.5 * k2v)
     
-    k4v = dt * force(positions + k3p, masses, G)
+    k4v = dt * acceleration(positions + k3p, masses, G)
     k4p = dt * (velocities + k3v)
 
     next_velocities = velocities + (k1v + 2*k2v + 2*k3v + k4v) / 6
