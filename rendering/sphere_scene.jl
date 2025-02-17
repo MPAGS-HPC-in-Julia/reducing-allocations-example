@@ -99,5 +99,8 @@ function generate_sphere_buffers(num_instances::Int, radii::Vector{Float32}, pos
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo[])
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW)
 
+    # Enable depth testing
+    glEnable(GL_DEPTH_TEST)
+
     return vao, vbo, ebo, instance_vbo, color_vbo, size_vbo, indices
 end
