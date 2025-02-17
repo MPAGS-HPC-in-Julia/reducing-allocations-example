@@ -97,6 +97,10 @@ function SphereScene(num_instances::Int, radii::Vector{Float32}, positions::Matr
 end
 
 function draw_scene!(scene::SphereScene, camera::Camera)
+    # Update instance positions buffer with new data
+    glBindBuffer(GL_ARRAY_BUFFER, scene.instance_vbo)
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(scene.positions), scene.positions)
+    
     glUseProgram(scene.shader.program)
     update_camera(camera, scene.shader.program)
 

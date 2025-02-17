@@ -72,7 +72,7 @@ function MainWindow(width::Integer, height::Integer, title::String)
 
     mouse_callback = MouseUpdate(camera, true, Float32(width / 2), Float32(height / 2))
     GLFW.SetCursorPosCallback(window, mouse_callback)
-    GLFW.SetInputMode(window, GLFW.CURSOR, GLFW.CURSOR_HIDDEN)
+    GLFW.SetInputMode(window, GLFW.CURSOR, GLFW.CURSOR_DISABLED)
 
     characters = init_font()
     text_projection = ortho(0.0f0, Float32(width), 0.0f0, Float32(height))
