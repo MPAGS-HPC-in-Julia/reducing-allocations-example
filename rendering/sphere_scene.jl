@@ -57,7 +57,7 @@ function SphereScene(num_instances::Int, radii::Vector{Float32}, positions::Matr
 
     # Instance position data
     glBindBuffer(GL_ARRAY_BUFFER, instance_vbo[])
-    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW)
+    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_DYNAMIC_DRAW)
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, C_NULL)
     glEnableVertexAttribArray(2)
     glVertexAttribDivisor(2, 1)
