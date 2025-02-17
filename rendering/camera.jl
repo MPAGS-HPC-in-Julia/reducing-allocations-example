@@ -104,7 +104,7 @@ function handle_input(window, camera, camera_speed)
     end
     if GLFW.GetKey(window, GLFW.KEY_D) == GLFW.PRESS
         camera.position += normalize(cross(camera.front, camera.up)) * camera_speed
-    end
+    end    
 end
 
 function update_camera(camera, program)

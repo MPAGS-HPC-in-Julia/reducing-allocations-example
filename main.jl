@@ -1,4 +1,4 @@
-include("rendering/rendering.jl")
+include("rendering/window.jl")
 include("rendering/sphere_scene.jl")
 include("physics.jl")
 include("initial_conditions.jl")
@@ -64,6 +64,7 @@ function main()
     nothing
 end
 
+# main()
 # main()
 # Profile.Allocs.clear()
 # Profile.Allocs.@profile sample_rate=1 main()

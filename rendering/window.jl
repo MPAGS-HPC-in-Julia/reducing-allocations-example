@@ -115,6 +115,7 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
     graph_vertices_buffer = zeros(Float32, 2 * window.time_horizon)
     string_buffer = PreallocatedString(100)
     vertices_store = Vector{Float32}(undef, 6*4);
+    last_pressed = false
     while !GLFW.WindowShouldClose(window.window)
         frame_start = time()
 
@@ -123,6 +124,15 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
 
         handle_input(window.window, window.camera, 0.05f0)
 
+        if GLFW.GetKey(window.window, GLFW.KEY_SPACE) == GLFW.PRESS
+            last_pressed = true
+        else
+            if last_pressed
+                window.is_paused = !window.is_paused
+            end
+            last_pressed = false
+        end
+        
         # Draw call here
         update_fn(window)
 
