@@ -7,7 +7,7 @@ using Profile
 using PProf
 using Profile.Allocs
 
-struct RenderFn{S, P, V, M}
+mutable struct RenderFn{FAST, S, P, V, M, C}
     scene::S
     positions::P
     velocities::V
@@ -15,29 +15,38 @@ struct RenderFn{S, P, V, M}
     G::Float64
     dt::Float64
     steps_per_frame::Int
+    cache::C
+    _use_fast::Val{FAST}
 end
 
-function (fn::RenderFn)(window::MainWindow)
+function (fn::RenderFn{FAST})(window::MainWindow) where FAST
     if (!window.is_paused)
         sub_dt = fn.dt / fn.steps_per_frame
         for _ in 1:fn.steps_per_frame
-            next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
-            fn.positions .= next_positions
-            fn.velocities .= next_velocities
+            if FAST
+                update_positions_fast!(fn.cache, fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
+                
+                # Swap the pointers on each cache
+                fn.positions, fn.cache.next_positions = fn.cache.next_positions, fn.positions
+                fn.velocities, fn.cache.next_velocities = fn.cache.next_velocities, fn.velocities
+            else
+                next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
+                fn.positions .= next_positions
+                fn.velocities .= next_velocities
+            end
         end
         fn.scene.positions .= transpose(fn.positions)
     end
     draw_scene!(fn.scene, window.camera)
 end
 
-function main()
-    N = 100
+function main(; N = 100, steps_per_frame = 10, use_fast = false)
     positions, velocities, masses = initial_conditions(N, 1, 5)
     min_radius = 10.0
     max_radius = 4.0
     G = 5.0
     dt = 0.001
-    steps_per_frame = 10
+    
     cube_root_masses = masses .^ (1/3)    
     min_mass, max_mass = extrema(@views cube_root_masses[2:end])
     radii = Float32.((cube_root_masses .- min_mass) ./ (max_mass - min_mass) .* (max_radius - min_radius) .+ min_radius)
@@ -55,7 +64,9 @@ function main()
     window = MainWindow(1920, 1080, "Sphere Rendering")
     scene = SphereScene(N, radii, gl_positions, colors)
 
-    render_fn = RenderFn(scene, positions, velocities, masses, G, dt, steps_per_frame)
+    update_cache = UpdateCache(N, 3, Float64)
+
+    render_fn = RenderFn(scene, positions, velocities, masses, G, dt, steps_per_frame, update_cache, use_fast ? Val(true) : Val(false))
     
     render_loop(render_fn, window)
 
