@@ -37,10 +37,11 @@ function generate_graph_vertices!(graph_vertices, frame_tracker)
         current_idx = frame_tracker.time_horizon
     end
 
+    scale = 60.0f0
     for i in 1:frame_tracker.time_horizon
         x = 2.0f0 * (frame_tracker.time_horizon - i) / (frame_tracker.time_horizon - 1) - 1.0f0
         idx = mod1(current_idx - (i - 1), frame_tracker.time_horizon)
-        y = frame_tracker.times[idx] / 0.060f0
+        y = frame_tracker.times[idx] * scale
         graph_vertices[2 * i - 1] = x
         graph_vertices[2 * i] = y
     end

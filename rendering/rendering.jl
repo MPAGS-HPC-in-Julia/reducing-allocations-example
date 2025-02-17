@@ -121,8 +121,6 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
         # Draw call here
         update_fn(window)
 
-        frame_time = Float32(time() - frame_start)
-        update_frame_tracker(window.frame_tracker, frame_time)
 
         generate_graph_vertices!(graph_vertices_buffer, window.frame_tracker)
         draw_graph(window.graph_shader.program, window.graph_vao[], window.graph_vbo[], graph_vertices_buffer)
@@ -132,6 +130,8 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
         GLFW.SwapBuffers(window.window)
         GLFW.PollEvents()
 
+        frame_time = Float32(time() - frame_start)
+        update_frame_tracker(window.frame_tracker, frame_time)
         # Control frame rate
         elapsed = time() - frame_start
         if elapsed < frame_time

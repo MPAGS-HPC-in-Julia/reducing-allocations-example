@@ -19,9 +19,12 @@ function draw_graph(graph_program, graph_vao, graph_vbo, graph_vertices)
 
     glLineWidth(2.0f0)
 
-    frame_limit = 20.0f0
+    frame_limit = 0.02f0
+
+    inv_scale = inv(60.0f0)
     for i in 1:length(graph_vertices)÷2-1
-        if graph_vertices[2i] > frame_limit / 60.0f0
+        t = graph_vertices[2i] * inv_scale
+        if t > frame_limit
             glUniform3f(color_loc, 1.0, 0.0, 0.0)  # Red
         else
             glUniform3f(color_loc, 1.0, 1.0, 0.0)  # Yellow
@@ -38,10 +41,10 @@ function draw_text(text_program, text_vao, text_vbo, characters, text_projection
     glUniform1i(glGetUniformLocation(text_program, "text"), 0)
 
     render_text("0ms", characters, 10.0f0, 25.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
-    render_text("60ms", characters, 10.0f0, 130.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
+    render_text("16ms", characters, 10.0f0, 100.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
 
-    max_ms = round(maximum(frame_tracker.times) * 1000, digits=1)
-    render_text("Max: $(max_ms)ms", characters, 10.0f0, 155.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
+    max_ms = Int(round(maximum(frame_tracker.times) * 1000))
+    render_text("Max: $(max_ms)ms", characters, 10.0f0, 200.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
 
     avg_fps = round(calculate_average_fps(frame_tracker.times), digits=1)
     fps_text = "Avg FPS: $avg_fps"

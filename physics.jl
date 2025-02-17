@@ -37,6 +37,8 @@ function acceleration(positions, masses, G)
     # Create N x 3 force array with x, y, z components
     return F
 end
+
+
 function update_positions(positions, velocities, masses, G, dt)
     # Calculate next position based on 2nd Order Runge Kutta method
     k1v = dt * acceleration(positions, masses, G)

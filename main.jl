@@ -11,23 +11,28 @@ struct RenderFn{S, P, V, M}
     masses::M
     G::Float64
     dt::Float64
+    steps_per_frame::Int
 end
 
 function (fn::RenderFn)(window::MainWindow)
-    next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, fn.dt)
-    fn.positions .= next_positions
-    fn.velocities .= next_velocities
+    sub_dt = fn.dt / fn.steps_per_frame
+    for _ in 1:fn.steps_per_frame
+        next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
+        fn.positions .= next_positions
+        fn.velocities .= next_velocities
+    end
     fn.scene.positions .= transpose(fn.positions)
     draw_scene!(fn.scene, window.camera)
 end
 
 function main()
-    N = 400
+    N = 200
     positions, velocities, masses = initial_conditions(N, 1, 5)
     min_radius = 10.0
     max_radius = 4.0
     G = 5.0
     dt = 0.001
+    steps_per_frame = 10
     cube_root_masses = masses .^ (1/3)    
     min_mass, max_mass = extrema(@views cube_root_masses[2:end])
     radii = Float32.((cube_root_masses .- min_mass) ./ (max_mass - min_mass) .* (max_radius - min_radius) .+ min_radius)
@@ -45,7 +50,7 @@ function main()
     window = MainWindow(1920, 1080, "Sphere Rendering")
     scene = SphereScene(N, radii, gl_positions, colors)
 
-    render_fn = RenderFn(scene, positions, velocities, masses, G, dt)
+    render_fn = RenderFn(scene, positions, velocities, masses, G, dt, steps_per_frame)
     
     render_loop(render_fn, window)
 
