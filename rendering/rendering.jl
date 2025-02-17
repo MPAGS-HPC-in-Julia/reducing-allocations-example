@@ -200,124 +200,25 @@ function main()
     # Create orthographic projection for text rendering
     text_projection = ortho(0.0f0, Float32(1920), 0.0f0, Float32(1080))
 
-    # Main loop
     while !GLFW.WindowShouldClose(window)
         frame_start = time()
 
         glClearColor(0.2f0, 0.3f0, 0.3f0, 1.0f0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        camera_speed = 0.05f0
-        if GLFW.GetKey(window, GLFW.KEY_W) == GLFW.PRESS
-            camera.position += camera_speed * camera.front
-        end
-        if GLFW.GetKey(window, GLFW.KEY_S) == GLFW.PRESS
-            camera.position -= camera_speed * camera.front
-        end
-        if GLFW.GetKey(window, GLFW.KEY_A) == GLFW.PRESS
-            camera.position -= normalize(cross(camera.front, camera.up)) * camera_speed
-        end
-        if GLFW.GetKey(window, GLFW.KEY_D) == GLFW.PRESS
-            camera.position += normalize(cross(camera.front, camera.up)) * camera_speed
-        end
+        handle_input(window, camera, 0.05f0)
 
-        # Use shader program
         glUseProgram(program)
+        update_camera(camera, program)
+        draw_spheres(vao, indices, num_instances)
 
-        # Set uniforms
-        view = GLfloat[
-            1 0 0 0;
-            0 1 0 0;
-            0 0 1 0;
-            0 0 0 1
-        ]
-        target = camera.position + camera.front
-        view = lookAt(camera.position, target, camera.up)
-
-        projection = perspective(45.0f0, 800.0f0 / 600.0f0, 0.1f0, 100.0f0)
-
-        view_loc = glGetUniformLocation(program, "view")
-        proj_loc = glGetUniformLocation(program, "projection")
-        light_pos_loc = glGetUniformLocation(program, "lightPos")
-
-        glUniformMatrix4fv(view_loc, 1, GL_FALSE, view)
-        glUniformMatrix4fv(proj_loc, 1, GL_FALSE, projection)
-        glUniform3fv(light_pos_loc, 1, camera.position)
-
-        # Draw spheres
-        glBindVertexArray(vao[])
-        glDrawElementsInstanced(GL_TRIANGLES, length(indices), GL_UNSIGNED_INT, C_NULL, num_instances)
-
-        # After main rendering, draw frame time graph
         frame_time = Float32(time() - frame_start)
-        frame_tracker.times[frame_tracker.index] = frame_time
-        frame_tracker.max_time = max(frame_tracker.max_time, frame_time)
-        frame_tracker.index = frame_tracker.index % time_horizon + 1
+        update_frame_tracker(frame_tracker, frame_time)
 
-        # Generate graph vertices with newest frames on right
-        graph_vertices = Float32[]
-        current_idx = frame_tracker.index - 1
-        if current_idx == 0
-            current_idx = time_horizon
-        end
+        graph_vertices = generate_graph_vertices(frame_tracker)
+        draw_graph(graph_program, graph_vao[], graph_vbo[], graph_vertices)
 
-        for i in 1:time_horizon
-            # Map x from [-1,1] with newest frame at 1
-            x = 2.0f0 * (time_horizon - i) / (time_horizon - 1) - 1.0f0
-            idx = mod1(current_idx - (i - 1), time_horizon)
-            y = frame_tracker.times[idx] / 0.060f0
-            push!(graph_vertices, x, y)
-        end
-
-        # Draw graph
-        glUseProgram(graph_program)
-        glBindVertexArray(graph_vao[])
-        glBindBuffer(GL_ARRAY_BUFFER, graph_vbo[])
-        glBufferData(GL_ARRAY_BUFFER, sizeof(graph_vertices), graph_vertices, GL_DYNAMIC_DRAW)
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, C_NULL)
-        glEnableVertexAttribArray(0)
-
-        height_loc = glGetUniformLocation(graph_program, "uHeight")
-        glUniform1f(height_loc, 0.1f0)  # Graph takes up bottom 10% of screen
-
-        color_loc = glGetUniformLocation(graph_program, "uColor")
-
-        # Increase line thickness
-        glLineWidth(2.0f0)
-
-        frame_limit = 20.0f0
-        # Draw red line for times > frame_limit, yellow for <= frame_limit
-        for i in 1:length(graph_vertices)÷2-1
-            if graph_vertices[2i] > frame_limit / 60.0f0
-                glUniform3f(color_loc, 1.0, 0.0, 0.0)  # Red
-            else
-                glUniform3f(color_loc, 1.0, 1.0, 0.0)  # Yellow
-            end
-            glDrawArrays(GL_LINES, i - 1, 2)
-        end
-
-        # Reset line width
-        glLineWidth(1.0f0)
-
-        # Draw scale markers and frame time information
-        glUseProgram(text_program)
-        glActiveTexture(GL_TEXTURE0)
-        glUniform1i(glGetUniformLocation(text_program, "text"), 0)
-
-        # Draw "0ms" at bottom left of the graph
-        render_text("0ms", characters, 10.0f0, 25.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
-
-        # Draw "60ms" at top left of the graph
-        render_text("60ms", characters, 10.0f0, 130.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
-
-        # Draw current max frame time
-        max_ms = min(round(maximum(frame_tracker.times) * 1000, digits=1), 60.0)
-        render_text("Max: $(max_ms)ms", characters, 10.0f0, 155.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
-
-        # Calculate and draw average FPS in top right corner
-        avg_fps = round(calculate_average_fps(frame_tracker.times), digits=1)
-        fps_text = "Avg FPS: $avg_fps"
-        render_text(fps_text, characters, 1700.0f0, 1050.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
+        draw_text(text_program, text_vao[], text_vbo[], characters, text_projection, frame_tracker)
 
         GLFW.SwapBuffers(window)
         GLFW.PollEvents()
@@ -353,4 +254,111 @@ function main()
 
     GLFW.DestroyWindow(window)
     GLFW.Terminate()
+end
+
+function handle_input(window, camera, camera_speed)
+    if GLFW.GetKey(window, GLFW.KEY_W) == GLFW.PRESS
+        camera.position += camera_speed * camera.front
+    end
+    if GLFW.GetKey(window, GLFW.KEY_S) == GLFW.PRESS
+        camera.position -= camera_speed * camera.front
+    end
+    if GLFW.GetKey(window, GLFW.KEY_A) == GLFW.PRESS
+        camera.position -= normalize(cross(camera.front, camera.up)) * camera_speed
+    end
+    if GLFW.GetKey(window, GLFW.KEY_D) == GLFW.PRESS
+        camera.position += normalize(cross(camera.front, camera.up)) * camera_speed
+    end
+end
+
+function update_camera(camera, program)
+    view = GLfloat[
+        1 0 0 0;
+        0 1 0 0;
+        0 0 1 0;
+        0 0 0 1
+    ]
+    target = camera.position + camera.front
+    view = lookAt(camera.position, target, camera.up)
+
+    projection = perspective(45.0f0, 800.0f0 / 600.0f0, 0.1f0, 100.0f0)
+
+    view_loc = glGetUniformLocation(program, "view")
+    proj_loc = glGetUniformLocation(program, "projection")
+    light_pos_loc = glGetUniformLocation(program, "lightPos")
+
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view)
+    glUniformMatrix4fv(proj_loc, 1, GL_FALSE, projection)
+    glUniform3fv(light_pos_loc, 1, camera.position)
+end
+
+function draw_spheres(vao, indices, num_instances)
+    glBindVertexArray(vao[])
+    glDrawElementsInstanced(GL_TRIANGLES, length(indices), GL_UNSIGNED_INT, C_NULL, num_instances)
+end
+
+function update_frame_tracker(frame_tracker, frame_time)
+    frame_tracker.times[frame_tracker.index] = frame_time
+    frame_tracker.max_time = max(frame_tracker.max_time, frame_time)
+    frame_tracker.index = frame_tracker.index % frame_tracker.time_horizon + 1
+end
+
+function generate_graph_vertices(frame_tracker)
+    graph_vertices = Float32[]
+    current_idx = frame_tracker.index - 1
+    if current_idx == 0
+        current_idx = frame_tracker.time_horizon
+    end
+
+    for i in 1:frame_tracker.time_horizon
+        x = 2.0f0 * (frame_tracker.time_horizon - i) / (frame_tracker.time_horizon - 1) - 1.0f0
+        idx = mod1(current_idx - (i - 1), frame_tracker.time_horizon)
+        y = frame_tracker.times[idx] / 0.060f0
+        push!(graph_vertices, x, y)
+    end
+    return graph_vertices
+end
+
+function draw_graph(graph_program, graph_vao, graph_vbo, graph_vertices)
+    glUseProgram(graph_program)
+    glBindVertexArray(graph_vao[])
+    glBindBuffer(GL_ARRAY_BUFFER, graph_vbo[])
+    glBufferData(GL_ARRAY_BUFFER, sizeof(graph_vertices), graph_vertices, GL_DYNAMIC_DRAW)
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, C_NULL)
+    glEnableVertexAttribArray(0)
+
+    height_loc = glGetUniformLocation(graph_program, "uHeight")
+    glUniform1f(height_loc, 0.1f0)  # Graph takes up bottom 10% of screen
+
+    color_loc = glGetUniformLocation(graph_program, "uColor")
+
+    glLineWidth(2.0f0)
+
+    frame_limit = 20.0f0
+    for i in 1:length(graph_vertices)÷2-1
+        if graph_vertices[2i] > frame_limit / 60.0f0
+            glUniform3f(color_loc, 1.0, 0.0, 0.0)  # Red
+        else
+            glUniform3f(color_loc, 1.0, 1.0, 0.0)  # Yellow
+        end
+        glDrawArrays(GL_LINES, i - 1, 2)
+    end
+
+    glLineWidth(1.0f0)
+end
+
+function draw_text(text_program, text_vao, text_vbo, characters, text_projection, frame_tracker)
+    glUseProgram(text_program)
+    glActiveTexture(GL_TEXTURE0)
+    glUniform1i(glGetUniformLocation(text_program, "text"), 0)
+
+    render_text("0ms", characters, 10.0f0, 25.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
+    render_text("60ms", characters, 10.0f0, 130.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
+
+    max_ms = round(maximum(frame_tracker.times) * 1000, digits=1)
+    render_text("Max: $(max_ms)ms", characters, 10.0f0, 155.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
+
+    avg_fps = round(calculate_average_fps(frame_tracker.times), digits=1)
+    fps_text = "Avg FPS: $avg_fps"
+    render_text(fps_text, characters, 1700.0f0, 1050.0f0, 0.5f0, text_projection, text_program, text_vao[], text_vbo[])
 end
