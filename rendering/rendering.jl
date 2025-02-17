@@ -11,6 +11,7 @@ include("geometry.jl")
 include("text.jl")
 include("utils.jl")
 include("drawing.jl")
+include("../PreallocatedString.jl")
 
 function create_graph_buffers()
     # Create graph VAO and VBO
@@ -51,6 +52,7 @@ mutable struct MainWindow
     mouse_callback::MouseUpdate
     characters::Dict{Char,Character}
     text_projection::Matrix{Float32}
+    is_paused::Bool
 end
 
 function MainWindow(width::Integer, height::Integer, title::String)
@@ -87,7 +89,7 @@ function MainWindow(width::Integer, height::Integer, title::String)
     return MainWindow(window, camera, graph_shader, text_shader,
         graph_vao, graph_vbo, text_vao, text_vbo,
         time_horizon, frame_tracker, target_fps, frame_time,
-        mouse_callback, characters, text_projection)
+        mouse_callback, characters, text_projection, true)
 end
 
 function cleanup(window::MainWindow)
@@ -109,7 +111,10 @@ function cleanup(window::MainWindow)
     GLFW.Terminate()
 end
 function render_loop(update_fn::F, window::MainWindow) where {F}
+    # Preallocate buffers to reduce allocations
     graph_vertices_buffer = zeros(Float32, 2 * window.time_horizon)
+    string_buffer = PreallocatedString(100)
+    vertices_store = Vector{Float32}(undef, 6*4);
     while !GLFW.WindowShouldClose(window.window)
         frame_start = time()
 
@@ -124,7 +129,7 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
         generate_graph_vertices!(graph_vertices_buffer, window.frame_tracker)
         draw_graph(window.graph_shader.program, window.graph_vao[], window.graph_vbo[], graph_vertices_buffer)
 
-        draw_text(window.text_shader.program, window.text_vao[], window.text_vbo[], window.characters, window.text_projection, window.frame_tracker)
+        draw_text(string_buffer, vertices_store, window.text_shader.program, window.text_vao[], window.text_vbo[], window.characters, window.text_projection, window.frame_tracker)
 
         GLFW.SwapBuffers(window.window)
         GLFW.PollEvents()

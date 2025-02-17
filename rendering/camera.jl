@@ -59,10 +59,14 @@ function lookAt(eye::SVector{3,Float32}, center::SVector{3,Float32}, up::SVector
     s = normalize(cross(f, up))
     u = cross(s, f)
 
-    return Float32[
-        s[1] s[2] s[3] -dot(s, eye);
-        u[1] u[2] u[3] -dot(u, eye);
-        -f[1] -f[2] -f[3] dot(f, eye);
+    dot1 = -dot(s, eye)
+    dot2 = -dot(u, eye)
+    dot3 = dot(f, eye)
+
+    return @SMatrix Float32[
+        s[1] s[2] s[3] dot1;
+        u[1] u[2] u[3] dot2;
+        -f[1] -f[2] -f[3] dot3;
         0.0 0.0 0.0 1.0
     ]
 end
@@ -70,7 +74,7 @@ end
 function perspective(fov::Float32, aspect::Float32, near::Float32, far::Float32)
     tanHalfFovy = tan(fov / 2.0f0)
 
-    return Float32[
+    return @SMatrix Float32[
         1.0f0/(aspect*tanHalfFovy) 0.0f0 0.0f0 0.0f0;
         0.0f0 1.0f0/tanHalfFovy 0.0f0 0.0f0;
         0.0f0 0.0f0 -(far + near)/(far-near) -2.0f0*far*near/(far-near);
@@ -79,7 +83,7 @@ function perspective(fov::Float32, aspect::Float32, near::Float32, far::Float32)
 end
 
 function ortho(left::Float32, right::Float32, bottom::Float32, top::Float32, near::Float32=-1.0f0, far::Float32=1.0f0)
-    return Float32[
+    return @SMatrix Float32[
         2/(right-left) 0 0 -(right + left)/(right-left);
         0 2/(top-bottom) 0 -(top + bottom)/(top-bottom);
         0 0 -2/(far-near) -(far + near)/(far-near);
@@ -104,14 +108,14 @@ function handle_input(window, camera, camera_speed)
 end
 
 function update_camera(camera, program)
-    view = GLfloat[
+    v = @SMatrix Float32[
         1 0 0 0;
         0 1 0 0;
         0 0 1 0;
         0 0 0 1
     ]
     target = camera.position + camera.front
-    view = lookAt(camera.position, target, camera.up)
+    v = lookAt(camera.position, target, camera.up)
 
     projection = perspective(45.0f0, 800.0f0 / 600.0f0, 0.1f0, 100.0f0)
 
@@ -119,7 +123,7 @@ function update_camera(camera, program)
     proj_loc = glGetUniformLocation(program, "projection")
     light_pos_loc = glGetUniformLocation(program, "lightPos")
 
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view)
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, v)
     glUniformMatrix4fv(proj_loc, 1, GL_FALSE, projection)
     glUniform3fv(light_pos_loc, 1, camera.position)
 end

@@ -3,6 +3,9 @@ include("rendering/sphere_scene.jl")
 include("physics.jl")
 include("initial_conditions.jl")
 using StaticArrays
+using Profile
+using PProf
+using Profile.Allocs
 
 struct RenderFn{S, P, V, M}
     scene::S
@@ -15,18 +18,20 @@ struct RenderFn{S, P, V, M}
 end
 
 function (fn::RenderFn)(window::MainWindow)
-    sub_dt = fn.dt / fn.steps_per_frame
-    for _ in 1:fn.steps_per_frame
-        next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
-        fn.positions .= next_positions
-        fn.velocities .= next_velocities
+    if (!window.is_paused)
+        sub_dt = fn.dt / fn.steps_per_frame
+        for _ in 1:fn.steps_per_frame
+            next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
+            fn.positions .= next_positions
+            fn.velocities .= next_velocities
+        end
+        fn.scene.positions .= transpose(fn.positions)
     end
-    fn.scene.positions .= transpose(fn.positions)
     draw_scene!(fn.scene, window.camera)
 end
 
 function main()
-    N = 200
+    N = 100
     positions, velocities, masses = initial_conditions(N, 1, 5)
     min_radius = 10.0
     max_radius = 4.0
@@ -59,4 +64,10 @@ function main()
     nothing
 end
 
-main()
+# main()
+# Profile.Allocs.clear()
+# Profile.Allocs.@profile sample_rate=1 main()
+# # Save the profiler results to disk
+# PProf.Allocs.save("profile.pb")
+# PProf.Allocs.pprof()
+

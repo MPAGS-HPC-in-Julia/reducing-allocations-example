@@ -55,7 +55,7 @@ function init_font()
 end
 
 
-function render_text(text::String, chars::Dict{Char,Character}, x::Float32, y::Float32, scale::Float32, projection::Matrix{Float32}, text_program::GLuint, vao::GLuint, vbo::GLuint)
+function render_text(text, vertices_store, chars::Dict{Char,Character}, x::Float32, y::Float32, scale::Float32, projection::Matrix{Float32}, text_program::GLuint, vao::GLuint, vbo::GLuint)
     glUseProgram(text_program)
     glUniformMatrix4fv(glGetUniformLocation(text_program, "projection"), 1, GL_FALSE, projection)
     glUniform3f(glGetUniformLocation(text_program, "textColor"), 1.0, 1.0, 1.0)
@@ -63,6 +63,9 @@ function render_text(text::String, chars::Dict{Char,Character}, x::Float32, y::F
     glBindVertexArray(vao)
 
     for c in text
+        if c isa UInt8
+            c = Char(c)
+        end
         ch = get(chars, c, chars[' '])  # Use space if character not found
 
         xpos = x + ch.metrics.horizontal_bearing[1] * scale
@@ -72,7 +75,7 @@ function render_text(text::String, chars::Dict{Char,Character}, x::Float32, y::F
         h = ch.size[2] * scale
 
         # Update VBO for each character
-        vertices = Float32[
+        vertices_store .= @SVector[
             xpos, ypos+h, 0.0, 0.0,
             xpos, ypos, 0.0, 1.0,
             xpos+w, ypos, 1.0, 1.0,
@@ -86,7 +89,7 @@ function render_text(text::String, chars::Dict{Char,Character}, x::Float32, y::F
 
         # Update content of VBO memory
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices)
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices_store), vertices_store)
 
         # Render quad
         glDrawArrays(GL_TRIANGLES, 0, 6)
