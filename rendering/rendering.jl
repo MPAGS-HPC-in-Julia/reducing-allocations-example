@@ -72,7 +72,7 @@ function MainWindow(width::Integer, height::Integer, title::String)
 
     mouse_callback = MouseUpdate(camera, true, Float32(width / 2), Float32(height / 2))
     GLFW.SetCursorPosCallback(window, mouse_callback)
-    GLFW.SetInputMode(window, GLFW.CURSOR, GLFW.CURSOR_DISABLED)
+    GLFW.SetInputMode(window, GLFW.CURSOR, GLFW.CURSOR_HIDDEN)
 
     characters = init_font()
     text_projection = ortho(0.0f0, Float32(width), 0.0f0, Float32(height))
@@ -113,21 +113,21 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
     while !GLFW.WindowShouldClose(window.window)
         frame_start = time()
 
-        glClearColor(0.2f0, 0.3f0, 0.3f0, 1.0f0)
+        glClearColor(0.1f0, 0.1f0, 0.1f0, 1.0f0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        handle_input(window.window, window.camera, 0.05f0)
+        # handle_input(window.window, window.camera, 0.05f0)
 
         # Draw call here
         update_fn(window)
 
         frame_time = Float32(time() - frame_start)
-        update_frame_tracker(window.frame_tracker, frame_time)
+        # update_frame_tracker(window.frame_tracker, frame_time)
 
-        generate_graph_vertices!(graph_vertices_buffer, window.frame_tracker)
-        draw_graph(window.graph_shader.program, window.graph_vao[], window.graph_vbo[], graph_vertices_buffer)
+        # generate_graph_vertices!(graph_vertices_buffer, window.frame_tracker)
+        # draw_graph(window.graph_shader.program, window.graph_vao[], window.graph_vbo[], graph_vertices_buffer)
 
-        draw_text(window.text_shader.program, window.text_vao[], window.text_vbo[], window.characters, window.text_projection, window.frame_tracker)
+        # draw_text(window.text_shader.program, window.text_vao[], window.text_vbo[], window.characters, window.text_projection, window.frame_tracker)
 
         GLFW.SwapBuffers(window.window)
         GLFW.PollEvents()
