@@ -86,3 +86,40 @@ function ortho(left::Float32, right::Float32, bottom::Float32, top::Float32, nea
         0 0 0 1
     ]
 end
+
+
+function handle_input(window, camera, camera_speed)
+    if GLFW.GetKey(window, GLFW.KEY_W) == GLFW.PRESS
+        camera.position += camera_speed * camera.front
+    end
+    if GLFW.GetKey(window, GLFW.KEY_S) == GLFW.PRESS
+        camera.position -= camera_speed * camera.front
+    end
+    if GLFW.GetKey(window, GLFW.KEY_A) == GLFW.PRESS
+        camera.position -= normalize(cross(camera.front, camera.up)) * camera_speed
+    end
+    if GLFW.GetKey(window, GLFW.KEY_D) == GLFW.PRESS
+        camera.position += normalize(cross(camera.front, camera.up)) * camera_speed
+    end
+end
+
+function update_camera(camera, program)
+    view = GLfloat[
+        1 0 0 0;
+        0 1 0 0;
+        0 0 1 0;
+        0 0 0 1
+    ]
+    target = camera.position + camera.front
+    view = lookAt(camera.position, target, camera.up)
+
+    projection = perspective(45.0f0, 800.0f0 / 600.0f0, 0.1f0, 100.0f0)
+
+    view_loc = glGetUniformLocation(program, "view")
+    proj_loc = glGetUniformLocation(program, "projection")
+    light_pos_loc = glGetUniformLocation(program, "lightPos")
+
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view)
+    glUniformMatrix4fv(proj_loc, 1, GL_FALSE, projection)
+    glUniform3fv(light_pos_loc, 1, camera.position)
+end
