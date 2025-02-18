@@ -65,7 +65,8 @@ function main(; N=100, steps_per_frame=10, use_fast=false)
     window = MainWindow(1920, 1080, "Sphere Rendering")
     scene = SphereScene(N, radii, gl_positions, colors)
 
-    update_cache = UpdateCache(N, 3, Float64)
+    # update_cache = UpdateCache(N, 3, Float64)
+    update_cache = nothing
 
     render_fn = RenderFn(scene, positions, velocities, masses, G, dt, steps_per_frame, update_cache, use_fast ? Val(true) : Val(false), Val(3))
 
