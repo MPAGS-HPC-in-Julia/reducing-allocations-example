@@ -57,8 +57,20 @@ end
 
 function MainWindow(width::Integer, height::Integer, title::String)
     GLFW.Init()
+    
+    # Set up fullscreen mode while maintaining resolution
+    primary_monitor = GLFW.GetPrimaryMonitor()
+    video_mode = GLFW.GetVideoMode(primary_monitor)
+    
+    # Center the window on screen
+    x_pos = (video_mode.width - width) ÷ 2
+    y_pos = (video_mode.height - height) ÷ 2
+    
+    GLFW.WindowHint(GLFW.DECORATED, false)  # Remove window decorations
     window = GLFW.CreateWindow(width, height, title)
+    GLFW.SetWindowPos(window, x_pos, y_pos)
     GLFW.MakeContextCurrent(window)
+    
     camera = Camera()
     graph_shader = Shader(GRAPH_VERTEX_SHADER, GRAPH_FRAGMENT_SHADER)
     text_shader = Shader(TEXT_VERTEX_SHADER, TEXT_FRAGMENT_SHADER)
