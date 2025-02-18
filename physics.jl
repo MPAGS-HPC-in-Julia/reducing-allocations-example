@@ -1,3 +1,23 @@
+function update_positions(positions, velocities, masses, G, dt)
+    # Calculate next position based on Runge Kutta method
+    k1v = dt * acceleration(positions, masses, G)
+    k1p = dt * velocities
+
+    k2v = (dt/2) * acceleration(positions + 0.5 * k1p, masses, G)
+    k2p = (dt/2) * (velocities + 0.5 * k1v)
+    
+    k3v = (dt/2) * acceleration(positions + 0.5 * k2p, masses, G)
+    k3p = (dt/2) * (velocities + 0.5 * k2v)
+    
+    k4v = dt * acceleration(positions + k3p, masses, G)
+    k4p = dt * (velocities + k3v)
+
+    next_velocities = velocities + (k1v + 2*k2v + 2*k3v + k4v) / 6
+    next_positions = positions + (k1p + 2*k2p + 2*k3p + k4p) / 6
+
+    return next_positions, next_velocities
+end
+
 function acceleration(positions, masses, G)
     # Positions: N x 3 matrix with x, y, z coordinates
     # Masses: N vector
@@ -36,25 +56,4 @@ function acceleration(positions, masses, G)
     # Use F=ma to calculate the acceleration
     A = hcat(Fx, Fy, Fz) ./ masses
     return A
-end
-
-
-function update_positions(positions, velocities, masses, G, dt)
-    # Calculate next position based on Runge Kutta method
-    k1v = dt * acceleration(positions, masses, G)
-    k1p = dt * velocities
-
-    k2v = (dt/2) * acceleration(positions + 0.5 * k1p, masses, G)
-    k2p = (dt/2) * (velocities + 0.5 * k1v)
-    
-    k3v = (dt/2) * acceleration(positions + 0.5 * k2p, masses, G)
-    k3p = (dt/2) * (velocities + 0.5 * k2v)
-    
-    k4v = dt * acceleration(positions + k3p, masses, G)
-    k4p = dt * (velocities + k3v)
-
-    next_velocities = velocities + (k1v + 2*k2v + 2*k3v + k4v) / 6
-    next_positions = positions + (k1p + 2*k2p + 2*k3p + k4p) / 6
-
-    return next_positions, next_velocities
 end
