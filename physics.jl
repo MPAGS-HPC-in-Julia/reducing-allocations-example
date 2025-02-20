@@ -1,3 +1,100 @@
+using BenchmarkTools
+using Test
+using StaticArrays
+include("initial_conditions.jl")
+
+function test_benchmark()
+    N = 100
+    positions, velocities, masses = initial_conditions(N, 1, 5)
+    G = 5.0
+    dt = 0.01
+
+    update_cache = init_update_cache(N)
+
+    original_next_pos, original_next_vel = update_positions(positions, velocities, masses, G, dt)
+    optimised_next_pos, optmised_next_vel = update_positions_fast!(update_cache, positions, velocities, masses, G, dt)
+    @testset "Positions" begin
+        @test original_next_pos ≈ optimised_next_pos
+    end
+    @testset "Velocities" begin
+        @test original_next_vel ≈ optmised_next_vel
+    end
+    display(@benchmark update_positions($positions, $velocities, $masses, $G, $dt))
+    display(@benchmark update_positions_fast!($update_cache, $positions, $velocities, $masses, $G, $dt))
+end
+
+
+function init_update_cache(N, T=Float64)
+    return (;
+        k1v=Matrix{T}(undef, N, 3),
+        k1p=Matrix{T}(undef, N, 3),
+        k2v=Matrix{T}(undef, N, 3),
+        k2p=Matrix{T}(undef, N, 3),
+        k3v=Matrix{T}(undef, N, 3),
+        k3p=Matrix{T}(undef, N, 3),
+        k4v=Matrix{T}(undef, N, 3),
+        k4p=Matrix{T}(undef, N, 3),
+        next_positions=Matrix{T}(undef, N, 3),
+        accelerations=Matrix{T}(undef, N, 3),
+        next_velocities=Matrix{T}(undef, N, 3),
+    )
+end
+
+function update_positions_fast!(cache, positions, velocities, masses, G, dt)
+    # Calculate next position based on Runge Kutta method
+    cache.k1v .= dt .* acceleration_fast!(cache.accelerations, positions, masses, G)
+    cache.k1p .= dt .* velocities
+
+    cache.next_positions .= positions .+ 0.5 .* cache.k1p
+    cache.k2v .= (dt / 2) .* acceleration_fast!(cache.accelerations, cache.next_positions, masses, G)
+    cache.k2p .= @. (dt / 2) * (velocities + 0.5 * cache.k1v)
+
+    cache.next_positions .= positions + 0.5 * cache.k2p
+    cache.k3v .= (dt / 2) .* acceleration_fast!(cache.accelerations, cache.next_positions, masses, G)
+    cache.k3p .= @. (dt / 2) * (velocities + 0.5 * cache.k2v)
+
+    cache.next_positions .= positions + cache.k3p
+    cache.k4v .= dt .* acceleration_fast!(cache.accelerations, positions + cache.k3p, masses, G)
+    cache.k4p .= @. dt * (velocities + cache.k3v)
+
+    cache.next_velocities .= @. velocities + (cache.k1v + 2 * cache.k2v + 2 * cache.k3v + cache.k4v) / 6
+    cache.next_positions .= @. positions + (cache.k1p + 2 * cache.k2p + 2 * cache.k3p + cache.k4p) / 6
+
+    return cache.next_positions, cache.next_velocities
+end
+
+function acceleration_fast!(accelerations, positions, masses, G)
+    N, D = size(positions)
+    accelerations .= 0
+    @inbounds for i in 1:N
+        p_i = @SVector [positions[i, k] for k in 1:3]
+        m_i = masses[i]
+        a_i = @SVector [0.0, 0.0, 0.0]
+        for j in i+1:N
+            # (3, ) Vector
+            p_j = @SVector [positions[j, k] for k in 1:3]
+            
+            # (3,) Vector
+            dp_ij = p_j .- p_i
+            # Scalars
+            r_ij = sqrt(sum(x->x^2, dp_ij))
+            # (3,) Vector
+            scaling = G / r_ij^3
+            a_ij = scaling * masses[j] .* dp_ij
+            a_ji = -scaling * m_i .* dp_ij
+            
+            a_i += a_ij
+            for k in 1:D
+                accelerations[j, k] += a_ji[k]
+            end
+        end
+        for k in 1:D
+            accelerations[i, k] += a_i[k]
+        end
+    end
+    return accelerations
+end
+
 function update_positions(positions, velocities, masses, G, dt)
     # Calculate next position based on Runge Kutta method
     k1v = dt * acceleration(positions, masses, G)

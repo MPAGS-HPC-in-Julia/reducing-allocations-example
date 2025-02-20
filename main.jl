@@ -25,11 +25,11 @@ function (fn::RenderFn{FAST})(window::MainWindow, dt) where {FAST}
         sub_dt = fn.dt / fn.steps_per_frame * dt
         for _ in 1:fn.steps_per_frame
             if FAST
-                update_positions_fast!(fn.cache, fn.positions, fn.velocities, fn.masses, fn.G, sub_dt, fn._dim)
+                update_positions_fast!(fn.cache, fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
 
                 # Swap the pointers on each cache
-                fn.positions, fn.cache.next_positions = fn.cache.next_positions, fn.positions
-                fn.velocities, fn.cache.next_velocities = fn.cache.next_velocities, fn.velocities
+                fn.positions .= fn.cache.next_positions
+                fn.velocities .= fn.cache.next_velocities
             else
                 next_positions, next_velocities = update_positions(fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
                 fn.positions .= next_positions
@@ -65,8 +65,8 @@ function main(; N=100, steps_per_frame=10, use_fast=false)
     window = MainWindow(1920, 1080, "Sphere Rendering")
     scene = SphereScene(N, radii, gl_positions, colors)
 
-    # update_cache = UpdateCache(N, 3, Float64)
-    update_cache = nothing
+    update_cache = init_update_cache(N)
+    # update_cache = nothing
 
     render_fn = RenderFn(scene, positions, velocities, masses, G, dt, steps_per_frame, update_cache, use_fast ? Val(true) : Val(false), Val(3))
 
@@ -77,11 +77,4 @@ function main(; N=100, steps_per_frame=10, use_fast=false)
     nothing
 end
 
-# main()
-# main()
-# Profile.Allocs.clear()
-# Profile.Allocs.@profile sample_rate=1 main()
-# # Save the profiler results to disk
-# PProf.Allocs.save("profile.pb")
-# PProf.Allocs.pprof()
-
+main(; N=500, use_fast=true)
