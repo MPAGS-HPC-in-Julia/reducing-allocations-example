@@ -57,8 +57,20 @@ end
 
 function MainWindow(width::Integer, height::Integer, title::String)
     GLFW.Init()
+    
+    # Set up fullscreen mode while maintaining resolution
+    primary_monitor = GLFW.GetPrimaryMonitor()
+    video_mode = GLFW.GetVideoMode(primary_monitor)
+    
+    # Center the window on screen
+    x_pos = (video_mode.width - width) ÷ 2
+    y_pos = (video_mode.height - height) ÷ 2
+    
+    GLFW.WindowHint(GLFW.DECORATED, false)  # Remove window decorations
     window = GLFW.CreateWindow(width, height, title)
+    GLFW.SetWindowPos(window, x_pos, y_pos)
     GLFW.MakeContextCurrent(window)
+    
     camera = Camera()
     graph_shader = Shader(GRAPH_VERTEX_SHADER, GRAPH_FRAGMENT_SHADER)
     text_shader = Shader(TEXT_VERTEX_SHADER, TEXT_FRAGMENT_SHADER)
@@ -116,7 +128,10 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
     string_buffer = PreallocatedString(100)
     vertices_store = Vector{Float32}(undef, 6*4);
     last_pressed = false
+    last_frame = time()
     while !GLFW.WindowShouldClose(window.window)
+        
+
         frame_start = time()
 
         glClearColor(0.1f0, 0.1f0, 0.1f0, 1.0f0)
@@ -134,7 +149,10 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
         end
         
         # Draw call here
-        update_fn(window)
+        t = time()
+        dt = t - last_frame
+        last_frame = t
+        update_fn(window, dt)
 
         generate_graph_vertices!(graph_vertices_buffer, window.frame_tracker)
         draw_graph(window.graph_shader.program, window.graph_vao[], window.graph_vbo[], graph_vertices_buffer)
@@ -146,10 +164,13 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
 
         frame_time = Float32(time() - frame_start)
         update_frame_tracker(window.frame_tracker, frame_time)
-        # Control frame rate
-        elapsed = time() - frame_start
-        if elapsed < frame_time
-            sleep(frame_time - elapsed)
-        end
+
+        # # Try to stick to target frame rate
+        # if frame_time < window.frame_time
+        #     # Round down to the lowest integer millisecond
+        #     sleep_time = round((window.frame_time - frame_time) * 1000, RoundDown) / 1000
+        #     sleep(sleep_time)
+        # end
+
     end
 end

@@ -2,7 +2,7 @@ function crossproduct(a, b)
     return [a[2]*b[3] - a[3]*b[2], a[3]*b[1] - a[1]*b[3], a[1]*b[2] - a[2]*b[1]]
 end
 
-function initial_conditions(N, thickness, radius)
+function initial_conditions(N, thickness, radius, T = Float64)
     sphere_min_radius = radius - thickness / 2
     sphere_max_radius = radius + thickness / 2
     # Generate random positions in a sphere of radius 
