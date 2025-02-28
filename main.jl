@@ -76,4 +76,4 @@ function main(; N=100, steps_per_frame=10, use_fast=false, vsync=false)
     nothing
 end
 
-# main(; N=500, use_fast=true)
+main(; N=300, use_fast=true)
