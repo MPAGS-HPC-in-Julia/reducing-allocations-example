@@ -8,7 +8,7 @@ function init_font()
     chars = Dict{Char,Character}()
 
     # Load font using FreeTypeAbstraction
-    font_face = FTFont(abspath(joinpath(@__DIR__, "..", "data", "Consolas.ttf")))
+    font_face = FTFont(abspath(joinpath(@__DIR__, "..", "data", "Roboto.ttf")))
 
     # Disable byte-alignment restriction
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
