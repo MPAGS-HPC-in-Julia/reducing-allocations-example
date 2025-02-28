@@ -20,12 +20,12 @@ mutable struct RenderFn{FAST,DIM,S,P,V,M,C}
     _dim::Val{DIM}
 end
 
-function (fn::RenderFn{FAST})(window::MainWindow, dt) where {FAST}
+function (fn::RenderFn{FAST, DIM})(window::MainWindow, dt) where {FAST, DIM}
     if (!window.is_paused)
         sub_dt = fn.dt / fn.steps_per_frame * dt
         for _ in 1:fn.steps_per_frame
             if FAST
-                update_positions_fast!(fn.cache, fn.positions, fn.velocities, fn.masses, fn.G, sub_dt)
+                update_positions_fast!(fn.cache, fn.positions, fn.velocities, fn.masses, fn.G, sub_dt, fn._dim)
 
                 # Swap the pointers on each cache
                 fn.positions .= fn.cache.next_positions
@@ -41,7 +41,7 @@ function (fn::RenderFn{FAST})(window::MainWindow, dt) where {FAST}
     draw_scene!(fn.scene, window.camera)
 end
 
-function main(; N=100, steps_per_frame=10, use_fast=false)
+function main(; N=100, steps_per_frame=10, use_fast=false, vsync=false)
     positions, velocities, masses = initial_conditions(N, 1, 5)
     min_radius = 10.0
     max_radius = 4.0
@@ -61,8 +61,7 @@ function main(; N=100, steps_per_frame=10, use_fast=false)
 
     gl_positions = Matrix{Float32}(transpose(positions))
 
-
-    window = MainWindow(1920, 1080, "Sphere Rendering")
+    window = MainWindow(1920, 1080, "Sphere Rendering", 60, vsync)
     scene = SphereScene(N, radii, gl_positions, colors)
 
     update_cache = init_update_cache(N)
@@ -77,4 +76,4 @@ function main(; N=100, steps_per_frame=10, use_fast=false)
     nothing
 end
 
-main(; N=500, use_fast=true)
+main(; N=300, use_fast=true)

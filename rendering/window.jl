@@ -55,12 +55,15 @@ mutable struct MainWindow
     is_paused::Bool
 end
 
-function MainWindow(width::Integer, height::Integer, title::String)
+function MainWindow(width::Integer, height::Integer, title::String, target_fps::Union{Integer, Nothing} = nothing, vsync = true)
     GLFW.Init()
     
     # Set up fullscreen mode while maintaining resolution
     primary_monitor = GLFW.GetPrimaryMonitor()
     video_mode = GLFW.GetVideoMode(primary_monitor)
+    
+    # Use monitor refresh rate if target_fps is not specified
+    actual_target_fps = isnothing(target_fps) ? video_mode.refreshrate : target_fps
     
     # Center the window on screen
     x_pos = (video_mode.width - width) ÷ 2
@@ -70,6 +73,10 @@ function MainWindow(width::Integer, height::Integer, title::String)
     window = GLFW.CreateWindow(width, height, title)
     GLFW.SetWindowPos(window, x_pos, y_pos)
     GLFW.MakeContextCurrent(window)
+    
+    # Set vysnc on window
+    vsync && GLFW.SwapInterval(1)
+    vsync || GLFW.SwapInterval(0)
     
     camera = Camera()
     graph_shader = Shader(GRAPH_VERTEX_SHADER, GRAPH_FRAGMENT_SHADER)
@@ -81,8 +88,8 @@ function MainWindow(width::Integer, height::Integer, title::String)
     time_horizon = 60 * 5
     frame_tracker = FrameTracker(zeros(Float32, time_horizon), time_horizon, 1, 0.0f0)
 
-    target_fps = 60
-    frame_time = 1.0f0 / target_fps
+    # Fix target_fps assignment (remove shadowing)
+    frame_time = 1.0f0 / actual_target_fps
 
     mouse_callback = MouseUpdate(camera, true, Float32(width / 2), Float32(height / 2))
     GLFW.SetCursorPosCallback(window, mouse_callback)
@@ -100,7 +107,7 @@ function MainWindow(width::Integer, height::Integer, title::String)
 
     return MainWindow(window, camera, graph_shader, text_shader,
         graph_vao, graph_vbo, text_vao, text_vbo,
-        time_horizon, frame_tracker, target_fps, frame_time,
+        time_horizon, frame_tracker, actual_target_fps, frame_time,
         mouse_callback, characters, text_projection, true)
 end
 
@@ -130,8 +137,6 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
     last_pressed = false
     last_frame = time()
     while !GLFW.WindowShouldClose(window.window)
-        
-
         frame_start = time()
 
         glClearColor(0.1f0, 0.1f0, 0.1f0, 1.0f0)
@@ -164,13 +169,5 @@ function render_loop(update_fn::F, window::MainWindow) where {F}
 
         frame_time = Float32(time() - frame_start)
         update_frame_tracker(window.frame_tracker, frame_time)
-
-        # # Try to stick to target frame rate
-        # if frame_time < window.frame_time
-        #     # Round down to the lowest integer millisecond
-        #     sleep_time = round((window.frame_time - frame_time) * 1000, RoundDown) / 1000
-        #     sleep(sleep_time)
-        # end
-
     end
 end
