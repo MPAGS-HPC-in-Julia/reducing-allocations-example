@@ -11,7 +11,8 @@ function test_benchmark()
     dt = 0.01
 
     update_cache = init_update_cache(N)
-    dim = Val(3)
+    D = size(positions, 2)
+    dim = Val(D)
     original_next_pos, original_next_vel = update_positions(positions, velocities, masses, G, dt)
     optimised_next_pos, optmised_next_vel = update_positions_fast!(update_cache, positions, velocities, masses, G, dt, dim)
     @testset "Positions" begin
@@ -41,7 +42,7 @@ function init_update_cache(N, T=Float64)
     )
 end
 
-function update_positions_fast!(cache, positions, velocities, masses, G, dt, dim::Val{D}) where {D}
+function update_positions_fast!(cache, positions, velocities, masses, G, dt, dim)
     # Calculate next position based on Runge Kutta method
     cache.k1v .= dt .* acceleration_fast!(cache.accelerations, positions, masses, G, dim)
     cache.k1p .= dt .* velocities
@@ -63,11 +64,9 @@ function update_positions_fast!(cache, positions, velocities, masses, G, dt, dim
 
     return cache.next_positions, cache.next_velocities
 end
-
-square(x) = x * x
-
+square(x) = x*x
 function acceleration_fast!(accelerations, positions, masses, G, ::Val{D}) where {D}
-    N, DA = size(positions)
+    N, _ = size(positions)
     accelerations .= 0
     @inbounds for i in 1:N
         p_i = SVector(positions[i, 1], positions[i, 2], positions[i, 3])
